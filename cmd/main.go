@@ -41,6 +41,12 @@ func main() {
 			"message": "hello world",
 		})
 	})
+	router.GET("/health", func(c *gin.Context) {
+
+		c.JSON(200, gin.H{
+			"message": "health check",
+		})
+	})
 	fmt.Println("Server running at http://localhost:8080/hello")
 	fmt.Println("server started at:8080", 8080)
 	err := router.Run(":8080")
