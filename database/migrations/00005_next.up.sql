@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS unique_user on users(email) WHERE archived_at IS NULL;

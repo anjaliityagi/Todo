@@ -163,3 +163,102 @@ func UpdateTodoById(c *gin.Context) {
 		"message": "updated successfully",
 	})
 }
+
+func RegisterUser(c *gin.Context) {
+	var registerUser models.RegisterUser
+
+	if err := c.ShouldBindJSON(&registerUser); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, err, "failed to parse request body")
+		return
+	}
+
+	if err := utils.Validate.Struct(registerUser); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, err, "validation failed")
+		return
+	}
+
+	exists, err := dbHelper.IsUserExists(registerUser.Email)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed to check user existence")
+		return
+	}
+	if exists {
+		utils.RespondError(c, http.StatusBadRequest, nil, "user already exists")
+		return
+	}
+
+	hashPassword, err := utils.HashPassword(registerUser.Password)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed while hashing password")
+		return
+	}
+
+	userID, err := dbHelper.CreateUser(registerUser.Name, registerUser.Email, hashPassword)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed to create user")
+		return
+	}
+
+	sessionID, err := dbHelper.CreateUserSession(userID)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed to create user session")
+		return
+	}
+
+	utils.RespondJSON(c, http.StatusCreated, gin.H{
+		"message": "user created successfully",
+		"token":   sessionID,
+	})
+}
+
+func LoginUser(c *gin.Context) {
+	var req models.LoginUser
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, err, "invalid request body")
+		return
+	}
+
+	if err := utils.Validate.Struct(req); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, err, "validation failed")
+		return
+	}
+
+	userID, err := dbHelper.GetUserByEmail(req.Email, req.Password)
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, err, "invalid credentials")
+		return
+	}
+
+	sessionID, err := dbHelper.CreateUserSession(userID)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed to create user session")
+		return
+	}
+
+	utils.RespondJSON(c, http.StatusOK, gin.H{
+		"token": sessionID,
+	})
+}
+
+func Logout(c *gin.Context) {
+
+	// Get token from header
+	token := c.GetHeader("Authorization")
+
+	if token == "" {
+		utils.RespondError(c, http.StatusUnauthorized, nil, "missing token")
+		return
+	}
+
+	// Delete session
+	err := dbHelper.DeleteSessionByToken(token)
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
+		return
+	}
+
+	utils.RespondJSON(c, http.StatusOK, gin.H{
+		"message": "logged out successfully",
+	})
+}

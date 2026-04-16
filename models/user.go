@@ -26,7 +26,8 @@ type UpdateTodoRequest struct {
 }
 
 type RegisterUser struct {
-	Name     string `json:"name" validate:"required,min=3"`
+	Name string `json:"name" validate:"required,min=3"`
+
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,lte=20,gte=6"`
 }

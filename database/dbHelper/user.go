@@ -3,6 +3,8 @@ package dbHelper
 import (
 	"Todo-Server/database"
 	"Todo-Server/models"
+	"Todo-Server/utils"
+
 	//"Todo-Server/utils"
 	"database/sql"
 	"errors"
@@ -128,33 +130,51 @@ func UpdateTodoById(
 	return nil
 }
 
-//func CreateUserSession(userID string) (string, error) {
-//	SQL := `INSERT INTO user_session(user_id)
-//			VALUES ($1) RETURNING id;`
-//	var sessionID string
-//	err := database.Todo.Get(&sessionID, SQL, userID)
-//	if err != nil {
-//		return "", err
-//	}
-//	return sessionID, nil
-//}
-//func GetUserByEmail(email, password string) (string, error) {
-//	SQL := `
-//		SELECT id, password
-//		FROM users
-//		WHERE email = $1 AND archived_at IS NULL;
-//	`
-//
-//	var user models.UserAuth
-//	err := database.Todo.Get(&user, SQL, email)
-//	if err != nil {
-//		if errors.Is(err, sql.ErrNoRows) {
-//			return "", errors.New("no user exist")
-//		}
-//		return "", err
-//	}
-//	if err := utils.CheckPassword(user.Password, password); err != nil {
-//		return "", errors.New("invalid credentials")
-//	}
-//	return user.ID, nil
-//}
+func CreateUserSession(userID string) (string, error) {
+	SQL := `INSERT INTO user_session(user_id)
+			VALUES ($1) RETURNING id;`
+	var sessionID string
+	err := database.Todo.Get(&sessionID, SQL, userID)
+	if err != nil {
+		return "", err
+	}
+	return sessionID, nil
+}
+func GetUserByEmail(email, password string) (string, error) {
+	SQL := `
+		SELECT id, password
+		FROM users
+		WHERE email = $1 AND archived_at IS NULL;
+	`
+
+	var user models.UserAuth
+	err := database.Todo.Get(&user, SQL, email)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", errors.New("no user exist")
+		}
+		return "", err
+	}
+	if err := utils.CheckPassword(user.Password, password); err != nil {
+		return "", errors.New("invalid credentials")
+	}
+	return user.ID, nil
+}
+
+func DeleteSessionByToken(token string) error {
+	SQL := `UPDATE user_session
+			SET archived_at = NOW()
+			WHERE id = $1 AND archived_at IS NULL`
+
+	result, err := database.Todo.Exec(SQL, token)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return errors.New("invalid session")
+	}
+
+	return nil
+}

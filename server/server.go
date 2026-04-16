@@ -22,12 +22,14 @@ func SetupRoutes() *Server {
 				"status": "Server is Running",
 			})
 		})
-
+		v1.POST("/register", handler.RegisterUser)
+		v1.POST("/login", handler.LoginUser)
 		v1.POST("/todos", handler.CreateTodo)
 		v1.GET("/todos", handler.GetAllTodos)
 		v1.GET("/todos/:id", handler.GetTodoById)
 		v1.PUT("/todos/:id", handler.UpdateTodoById)
 		v1.DELETE("/todos/:id", handler.DeleteTodoById)
+		v1.POST("/logout", handler.Logout)
 	}
 
 	return &Server{
