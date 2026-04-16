@@ -2,11 +2,10 @@ package main
 
 import (
 	"Todo-Server/database"
+	"Todo-Server/server"
 	"fmt"
 	"log"
 	"os"
-
-	"github.com/gin-gonic/gin"
 )
 
 func getEnv(key, fallback string) string {
@@ -15,6 +14,7 @@ func getEnv(key, fallback string) string {
 	}
 	return fallback
 }
+
 func main() {
 
 	dbHost := getEnv("DB_HOST", "localhost")
@@ -23,7 +23,6 @@ func main() {
 	dbPassword := getEnv("DB_PASSWORD", "local")
 	dbName := getEnv("DB_NAME", "mercury-dev")
 	sslMode := getEnv("DB_SSLMODE", string(database.SSLModeDisable))
-	//serverPort := getEnv("SERVER_PORT", "8080")
 
 	database.ConnectandMigrate(
 		dbHost,
@@ -33,25 +32,14 @@ func main() {
 		dbPassword,
 		database.SSLMode(sslMode),
 	)
-	router := gin.Default()
-	fmt.Println("server is running")
-	router.GET("/hello", func(c *gin.Context) {
 
-		c.JSON(200, gin.H{
-			"message": "hello world",
-		})
-	})
-	router.GET("/health", func(c *gin.Context) {
+	fmt.Println("Database connected")
 
-		c.JSON(200, gin.H{
-			"message": "health check",
-		})
-	})
-	fmt.Println("Server running at http://localhost:8080/hello")
-	fmt.Println("server started at:8080", 8080)
-	err := router.Run(":8080")
-	if err != nil {
+	srv := server.SetupRoutes()
+
+	fmt.Println("Server running at http://localhost:8080")
+
+	if err := srv.Router.Run(":8080"); err != nil {
 		log.Fatal(err)
 	}
-
 }
