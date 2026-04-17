@@ -4,9 +4,6 @@ import (
 	"Todo-Server/database/dbHelper"
 	"Todo-Server/models"
 	"Todo-Server/utils"
-	"database/sql"
-	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -15,16 +12,10 @@ import (
 
 func CreateTodo(c *gin.Context) {
 	var todoRequest models.CreateTodo
+	userID := c.Param("user-id")
 
-	userID := "550e8400-e29b-41d4-a716-446655440000"
-
-	if err := utils.ParseBody(c, &todoRequest); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, err, "failed to parse body")
-		return
-	}
-
-	if err := utils.Validate.Struct(todoRequest); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, err, "validation failed")
+	if err := c.ShouldBindJSON(&todoRequest); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, err, "failed to parse request body")
 		return
 	}
 
@@ -33,7 +24,7 @@ func CreateTodo(c *gin.Context) {
 		return
 	}
 
-	todo, err := dbHelper.CreateTodo(
+	err := dbHelper.CreateTodo(
 		userID,
 		todoRequest.Name,
 		todoRequest.Description,
@@ -44,124 +35,7 @@ func CreateTodo(c *gin.Context) {
 		return
 	}
 
-	utils.RespondJSON(c, http.StatusCreated, todo)
-}
-
-func GetAllTodos(c *gin.Context) {
-	fmt.Println("hello")
-	completeStr := c.Query("status")
-	expiringAtStr := c.Query("expiringAt")
-	search := c.Query("search")
-
-	userID := "550e8400-e29b-41d4-a716-446655440000"
-
-	if expiringAtStr != "" {
-		d, err := time.Parse("2006-01-02", expiringAtStr)
-		if err != nil {
-			utils.RespondError(c, http.StatusBadRequest, err, "invalid date")
-			return
-		}
-		if d.Before(time.Now()) {
-			expiringAtStr = ""
-		}
-	}
-	fmt.Println("hello")
-	todos, err := dbHelper.GetTodos(userID, search, expiringAtStr, completeStr)
-	if err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, err, "Failed to fetch todos")
-		return
-	}
-
-	utils.RespondJSON(c, http.StatusOK, gin.H{
-		"todos": todos,
-	})
-}
-
-func GetTodoById(c *gin.Context) {
-	todoID := c.Param("id")
-
-	if todoID == "" {
-		utils.RespondError(c, http.StatusBadRequest, nil, "todo id is required")
-		return
-	}
-
-	userID := "550e8400-e29b-41d4-a716-446655440000"
-
-	todo, err := dbHelper.GetTodoByID(todoID, userID)
-	if err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, err, "failed to fetch todo")
-		return
-	}
-
-	utils.RespondJSON(c, http.StatusOK, todo)
-}
-
-func DeleteTodoById(c *gin.Context) {
-	todoID := c.Param("id")
-
-	if todoID == "" {
-		utils.RespondError(c, http.StatusBadRequest, nil, "required todo ID")
-		return
-	}
-
-	userID := "550e8400-e29b-41d4-a716-446655440000"
-
-	err := dbHelper.DeleteTodoById(userID, todoID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			utils.RespondError(c, http.StatusNotFound, err, "todo not found")
-			return
-		}
-		utils.RespondError(c, http.StatusInternalServerError, err, "failed to delete todo")
-		return
-	}
-
-	utils.RespondJSON(c, http.StatusOK, gin.H{
-		"message": "todo deleted successfully",
-	})
-}
-
-func UpdateTodoById(c *gin.Context) {
-	todoID := c.Param("id")
-
-	if todoID == "" {
-		utils.RespondError(c, http.StatusBadRequest, nil, "required todo id")
-		return
-	}
-
-	var todo models.UpdateTodoRequest
-
-	if err := utils.ParseBody(c, &todo); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, err, "invalid request body")
-		return
-	}
-
-	if err := utils.Validate.Struct(todo); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, err, "validation failed")
-		return
-	}
-
-	userID := "550e8400-e29b-41d4-a716-446655440000"
-	err := dbHelper.UpdateTodoById(
-		todo.Name,
-		todo.Description,
-		todo.Complete,
-		todo.ExpiringAt,
-		todoID,
-		userID,
-	)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			utils.RespondError(c, http.StatusNotFound, err, "todo not found")
-			return
-		}
-		utils.RespondError(c, http.StatusInternalServerError, err, "failed to update todo")
-		return
-	}
-
-	utils.RespondJSON(c, http.StatusOK, gin.H{
-		"message": "updated successfully",
-	})
+	utils.RespondJSON(c, http.StatusCreated, "todo created successfully")
 }
 
 func RegisterUser(c *gin.Context) {
@@ -172,17 +46,12 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
-	if err := utils.Validate.Struct(registerUser); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, err, "validation failed")
-		return
-	}
-
-	exists, err := dbHelper.IsUserExists(registerUser.Email)
+	userExist, err := dbHelper.IsUserExists(registerUser.Email)
 	if err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, err, "failed to check user existence")
 		return
 	}
-	if exists {
+	if userExist {
 		utils.RespondError(c, http.StatusBadRequest, nil, "user already exists")
 		return
 	}
@@ -193,21 +62,15 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 
-	userID, err := dbHelper.CreateUser(registerUser.Name, registerUser.Email, hashPassword)
+	err = dbHelper.CreateUser(registerUser.Name, registerUser.Email, hashPassword)
 	if err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, err, "failed to create user")
 		return
 	}
 
-	sessionID, err := dbHelper.CreateUserSession(userID)
-	if err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, err, "failed to create user session")
-		return
-	}
-
 	utils.RespondJSON(c, http.StatusCreated, gin.H{
 		"message": "user created successfully",
-		"token":   sessionID,
+		//"token":   sessionID,
 	})
 }
 
@@ -219,18 +82,18 @@ func LoginUser(c *gin.Context) {
 		return
 	}
 
-	if err := utils.Validate.Struct(req); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, err, "validation failed")
-		return
-	}
-
-	userID, err := dbHelper.GetUserByEmail(req.Email, req.Password)
+	userDetail, err := dbHelper.GetUserByEmail(req.Email)
 	if err != nil {
 		utils.RespondError(c, http.StatusUnauthorized, err, "invalid credentials")
 		return
 	}
+	err = utils.CheckPassword(userDetail.Password, req.Password)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, err, "wrong password")
+		return
+	}
 
-	sessionID, err := dbHelper.CreateUserSession(userID)
+	sessionID, err := dbHelper.CreateUserSession(userDetail.ID)
 	if err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, err, "failed to create user session")
 		return
@@ -243,7 +106,6 @@ func LoginUser(c *gin.Context) {
 
 func Logout(c *gin.Context) {
 
-	// Get token from header
 	token := c.GetHeader("Authorization")
 
 	if token == "" {
@@ -251,7 +113,6 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	// Delete session
 	err := dbHelper.DeleteSessionByToken(token)
 	if err != nil {
 		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
@@ -259,6 +120,6 @@ func Logout(c *gin.Context) {
 	}
 
 	utils.RespondJSON(c, http.StatusOK, gin.H{
-		"message": "logged out successfully",
+		"message": " user logged out successfully",
 	})
 }
