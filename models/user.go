@@ -22,3 +22,20 @@ type UserAuth struct {
 	ID       string `db:"id"`
 	Password string `db:"password"`
 }
+
+type UpdateTodo struct {
+	Name        string    `json:"name" binding:"max=30"`
+	Description string    `json:"description" binding:"max=200"`
+	Complete    bool      `json:"complete" `
+	ExpiringAt  time.Time `json:"expiringAt"`
+}
+
+type Todo struct {
+	TodoID      string    `db:"id" json:"todo_id"`
+	UserID      string    `db:"user_id" json:"user_id"`
+	Name        string    `db:"name" json:"name"`
+	Description string    `db:"description" json:"description"`
+	Complete    bool      `db:"complete" json:"complete"`
+	ExpiringAt  time.Time `db:"expiring_at" json:"expiringAt"`
+	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
+}

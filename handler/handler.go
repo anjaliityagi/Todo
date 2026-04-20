@@ -4,6 +4,7 @@ import (
 	"Todo-Server/database/dbHelper"
 	"Todo-Server/models"
 	"Todo-Server/utils"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -12,7 +13,15 @@ import (
 
 func CreateTodo(c *gin.Context) {
 	var todoRequest models.CreateTodo
-	userID := c.Param("user-id")
+
+	token := c.GetHeader("Authorization")
+
+	userID, err := dbHelper.GetUserIDBySession(token)
+	fmt.Println(userID)
+	if err != nil {
+		utils.RespondError(c, 401, err, "Token Error")
+		return
+	}
 
 	if err := c.ShouldBindJSON(&todoRequest); err != nil {
 		utils.RespondError(c, http.StatusBadRequest, err, "failed to parse request body")
@@ -24,7 +33,7 @@ func CreateTodo(c *gin.Context) {
 		return
 	}
 
-	err := dbHelper.CreateTodo(
+	err = dbHelper.CreateTodo(
 		userID,
 		todoRequest.Name,
 		todoRequest.Description,
@@ -122,4 +131,85 @@ func Logout(c *gin.Context) {
 	utils.RespondJSON(c, http.StatusOK, gin.H{
 		"message": " user logged out successfully",
 	})
+}
+
+func UpdateTodo(c *gin.Context) {
+	var updateTodo models.UpdateTodo
+	if err := c.ShouldBindJSON(&updateTodo); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, err, "failed to parse request body")
+		return
+	}
+	token := c.GetHeader("Authorization")
+	userID, err := dbHelper.GetUserIDBySession(token)
+	todoID := c.Params.ByName("todo-id")
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
+	}
+	err = dbHelper.UpdateTodo(todoID, userID, updateTodo.Name, updateTodo.Description, updateTodo.ExpiringAt, updateTodo.Complete)
+	if err != nil {
+		utils.RespondError(c, 500, err, "invalid request")
+	}
+
+	utils.RespondJSON(c, http.StatusCreated, gin.H{
+		"message": "todo updated successfully",
+	})
+}
+
+func DeleteTodo(c *gin.Context) {
+	token := c.GetHeader("Authorization")
+	userID, err := dbHelper.GetUserIDBySession(token)
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
+	}
+	todoID := c.Params.ByName("todo-id")
+	err = dbHelper.DeleteTodo(todoID, userID)
+	if err != nil {
+		utils.RespondError(c, 500, err, "invalid request")
+	}
+	utils.RespondJSON(c, http.StatusCreated, gin.H{
+		"message": "todo deleted successfully",
+	})
+}
+
+func FetchTodoById(c *gin.Context) {
+
+	token := c.GetHeader("Authorization")
+	userID, err := dbHelper.GetUserIDBySession(token)
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
+		return
+	}
+	id := c.Params.ByName("todo-id")
+	var todo models.Todo
+	todo, err = dbHelper.GetTodoById(id, userID)
+
+	if err != nil {
+		utils.RespondError(c, 500, err, "invalid request")
+		return
+	}
+	utils.RespondJSON(c, http.StatusOK, todo)
+
+}
+
+func GetAllTodos(c *gin.Context) {
+ 
+	search := c.Query("search")
+	status := c.Query("status")
+	date := c.Query("expiringAt")
+
+	token := c.GetHeader("Authorization")
+
+	userID, err := dbHelper.GetUserIDBySession(token)
+	if err != nil {
+		c.JSON(401, gin.H{"error": "invalid session"})
+		return
+	}
+
+	todos, err := dbHelper.GetTodos(userID, search, date, status)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	utils.RespondJSON(c, http.StatusOK, todos)
 }

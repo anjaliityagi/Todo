@@ -3,7 +3,7 @@ package dbHelper
 import (
 	"Todo-Server/database"
 	"Todo-Server/models"
-
+	"fmt"
 	"time"
 )
 
@@ -30,7 +30,6 @@ func CreateTodo(userID, name, description string, expiringAt time.Time) error {
 	SQL := `INSERT INTO todos (user_id,name,description,expiring_at)
 			VALUES ($1,$2,$3,$4)`
 
-	//var todo models.Todos
 	_, err := database.Todo.Exec(SQL, userID, name, description, expiringAt)
 	return err
 }
@@ -71,4 +70,119 @@ func DeleteSessionByToken(token string) error {
 	}
 
 	return nil
+}
+
+func GetUserIDBySession(token string) (string, error) {
+	SQL := `SELECT user_id FROM user_session WHERE id = $1 and archived_at IS NULL `
+
+	var userId string
+
+	fmt.Println(userId)
+
+	err := database.Todo.Get(&userId, SQL, token)
+	if err != nil {
+		return "", err
+	}
+	return userId, nil
+}
+
+func UpdateTodo(id, userID, name string, description string, expiringAt time.Time, complete bool) error {
+
+	SQL := `UPDATE todos
+SET name = $3,
+    description = $4,
+    expiring_at = $5,
+    complete=$6
+WHERE id = $1
+  AND user_id = $2
+  AND archived_at IS NULL; `
+
+	_, err := database.Todo.Exec(SQL, id, userID, name, description, expiringAt, complete)
+	return err
+
+}
+
+func DeleteTodo(id, userId string) error {
+	SQL := `UPDATE todos
+SET archived_at = NOW()
+where id = $1
+  AND user_id = $2`
+
+	_, err := database.Todo.Exec(SQL, id, userId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetTodoById(todoId string, userId string) (models.Todo, error) {
+	var todo models.Todo
+	SQL := `
+SELECT name, description, complete, expiring_at, created_at
+FROM todos
+WHERE id = $1
+  AND user_id = $2 `
+	err := database.Todo.Get(&todo, SQL, todoId, userId)
+	if err != nil {
+		return models.Todo{}, err
+	}
+	return todo, nil
+}
+func GetTodos(userID, search, date, status string) ([]models.Todo, error) {
+
+	SQL := `SELECT id,
+	       user_id,
+	       name,
+	       description,
+	       complete,
+	       expiring_at,
+	       created_at
+	FROM todos
+	WHERE user_id = $1
+	  AND archived_at IS NULL`
+
+	args := []interface{}{userID}
+	i := 2
+	if status != "" {
+		if status == "completed" {
+			SQL += fmt.Sprintf(" AND complete = $%d", i)
+			args = append(args, true)
+			i++
+
+		} else if status == "pending" {
+			SQL += " AND complete = false AND expiring_at >= NOW()"
+
+		} else if status == "expired" {
+			SQL += " AND complete = false AND expiring_at < NOW()"
+
+		} else {
+			return nil, fmt.Errorf("invalid status")
+		}
+	}
+	if date != "" {
+		t, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			return nil, fmt.Errorf("invalid date format (use YYYY-MM-DD)")
+		}
+		SQL += fmt.Sprintf(" AND expiring_at <= $%d", i)
+		args = append(args, t)
+		i++
+	}
+
+	if search != "" {
+		SQL += fmt.Sprintf(" AND name ILIKE $%d", i)
+		args = append(args, "%"+search+"%")
+		i++
+	}
+
+	SQL += " ORDER BY expiring_at"
+
+	var todos []models.Todo
+
+	err := database.Todo.Select(&todos, SQL, args...)
+	if err != nil {
+		return nil, err
+	}
+	return todos, nil
 }
