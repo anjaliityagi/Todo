@@ -24,15 +24,15 @@ type UserAuth struct {
 }
 
 type UpdateTodo struct {
-	Name        string    `json:"name" binding:"max=30"`
-	Description string    `json:"description" binding:"max=200"`
-	Complete    bool      `json:"complete" `
-	ExpiringAt  time.Time `json:"expiringAt"`
+	Name        *string    `json:"name" binding:"omitempty,max=30"`
+	Description *string    `json:"description" binding:"omitempty,max=200"`
+	Complete    *bool      `json:"complete" `
+	ExpiringAt  *time.Time `json:"expiringAt"`
 }
 
 type Todo struct {
-	TodoID      string    `db:"id" json:"todo_id"`
-	UserID      string    `db:"user_id" json:"user_id"`
+	TodoID      string    `db:"id" json:"id"`
+	UserID      string    `db:"user_id" json:"userId"`
 	Name        string    `db:"name" json:"name"`
 	Description string    `db:"description" json:"description"`
 	Complete    bool      `db:"complete" json:"complete"`

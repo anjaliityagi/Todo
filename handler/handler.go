@@ -4,8 +4,8 @@ import (
 	"Todo-Server/database/dbHelper"
 	"Todo-Server/models"
 	"Todo-Server/utils"
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,14 +14,7 @@ import (
 func CreateTodo(c *gin.Context) {
 	var todoRequest models.CreateTodo
 
-	token := c.GetHeader("Authorization")
-
-	userID, err := dbHelper.GetUserIDBySession(token)
-	fmt.Println(userID)
-	if err != nil {
-		utils.RespondError(c, 401, err, "Token Error")
-		return
-	}
+	userID := c.GetString("userID")
 
 	if err := c.ShouldBindJSON(&todoRequest); err != nil {
 		utils.RespondError(c, http.StatusBadRequest, err, "failed to parse request body")
@@ -33,7 +26,7 @@ func CreateTodo(c *gin.Context) {
 		return
 	}
 
-	err = dbHelper.CreateTodo(
+	err := dbHelper.CreateTodo(
 		userID,
 		todoRequest.Name,
 		todoRequest.Description,
@@ -44,7 +37,10 @@ func CreateTodo(c *gin.Context) {
 		return
 	}
 
-	utils.RespondJSON(c, http.StatusCreated, "todo created successfully")
+	utils.RespondJSON(c, http.StatusCreated, gin.H{
+
+		"message": "todo created successfully",
+	})
 }
 
 func RegisterUser(c *gin.Context) {
@@ -61,7 +57,7 @@ func RegisterUser(c *gin.Context) {
 		return
 	}
 	if userExist {
-		utils.RespondError(c, http.StatusBadRequest, nil, "user already exists")
+		utils.RespondError(c, http.StatusConflict, nil, "user already exists")
 		return
 	}
 
@@ -79,7 +75,6 @@ func RegisterUser(c *gin.Context) {
 
 	utils.RespondJSON(c, http.StatusCreated, gin.H{
 		"message": "user created successfully",
-		//"token":   sessionID,
 	})
 }
 
@@ -93,12 +88,13 @@ func LoginUser(c *gin.Context) {
 
 	userDetail, err := dbHelper.GetUserByEmail(req.Email)
 	if err != nil {
-		utils.RespondError(c, http.StatusUnauthorized, err, "invalid credentials")
+		utils.RespondError(c, http.StatusInternalServerError, err, "invalid credentials")
 		return
 	}
+
 	err = utils.CheckPassword(userDetail.Password, req.Password)
 	if err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, err, "wrong password")
+		utils.RespondError(c, http.StatusForbidden, err, "wrong password")
 		return
 	}
 
@@ -115,7 +111,7 @@ func LoginUser(c *gin.Context) {
 
 func Logout(c *gin.Context) {
 
-	token := c.GetHeader("Authorization")
+	token := c.GetString("sessionId")
 
 	if token == "" {
 		utils.RespondError(c, http.StatusUnauthorized, nil, "missing token")
@@ -124,92 +120,121 @@ func Logout(c *gin.Context) {
 
 	err := dbHelper.DeleteSessionByToken(token)
 	if err != nil {
-		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
+		utils.RespondError(c, http.StatusInternalServerError, err, "invalid session")
 		return
 	}
 
 	utils.RespondJSON(c, http.StatusOK, gin.H{
-		"message": " user logged out successfully",
+		"message": "user logged out successfully",
 	})
 }
 
-func UpdateTodo(c *gin.Context) {
+func UpdateTodoById(c *gin.Context) {
 	var updateTodo models.UpdateTodo
+
 	if err := c.ShouldBindJSON(&updateTodo); err != nil {
 		utils.RespondError(c, http.StatusBadRequest, err, "failed to parse request body")
 		return
 	}
-	token := c.GetHeader("Authorization")
-	userID, err := dbHelper.GetUserIDBySession(token)
-	todoID := c.Params.ByName("todo-id")
+
+	userID := c.GetString("userID")
+	todoID := c.Param("todo-id")
+
+	err := dbHelper.UpdateTodoByID(
+		todoID,
+		userID,
+		updateTodo)
 	if err != nil {
-		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
-	}
-	err = dbHelper.UpdateTodo(todoID, userID, updateTodo.Name, updateTodo.Description, updateTodo.ExpiringAt, updateTodo.Complete)
-	if err != nil {
-		utils.RespondError(c, 500, err, "invalid request")
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed to update todo")
+		return
 	}
 
-	utils.RespondJSON(c, http.StatusCreated, gin.H{
+	utils.RespondJSON(c, http.StatusOK, gin.H{
+
 		"message": "todo updated successfully",
 	})
 }
 
 func DeleteTodo(c *gin.Context) {
-	token := c.GetHeader("Authorization")
-	userID, err := dbHelper.GetUserIDBySession(token)
+
+	userID := c.GetString("userID")
+
+	todoID := c.Param("todo-id")
+
+	err := dbHelper.DeleteTodo(todoID, userID)
 	if err != nil {
-		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed to delete todo")
+		return
 	}
-	todoID := c.Params.ByName("todo-id")
-	err = dbHelper.DeleteTodo(todoID, userID)
-	if err != nil {
-		utils.RespondError(c, 500, err, "invalid request")
-	}
-	utils.RespondJSON(c, http.StatusCreated, gin.H{
+
+	utils.RespondJSON(c, http.StatusOK, gin.H{
+
 		"message": "todo deleted successfully",
 	})
 }
 
 func FetchTodoById(c *gin.Context) {
 
-	token := c.GetHeader("Authorization")
-	userID, err := dbHelper.GetUserIDBySession(token)
-	if err != nil {
-		utils.RespondError(c, http.StatusUnauthorized, err, "invalid session")
-		return
-	}
-	id := c.Params.ByName("todo-id")
-	var todo models.Todo
-	todo, err = dbHelper.GetTodoById(id, userID)
+	userID := c.GetString("userID")
 
+	id := c.Param("todo-id")
+
+	todo, err := dbHelper.FetchTodoById(id, userID)
 	if err != nil {
-		utils.RespondError(c, 500, err, "invalid request")
+		utils.RespondError(c, http.StatusInternalServerError, err, "failed to fetch todo")
 		return
 	}
+
 	utils.RespondJSON(c, http.StatusOK, todo)
-
 }
 
-func GetAllTodos(c *gin.Context) {
- 
+func FetchAllTodos(c *gin.Context) {
+
 	search := c.Query("search")
 	status := c.Query("status")
 	date := c.Query("expiringAt")
 
-	token := c.GetHeader("Authorization")
+	limitStr := c.Query("limit")
+	pageStr := c.Query("page")
 
-	userID, err := dbHelper.GetUserIDBySession(token)
+	limit := 1
+	page := 1
+
+	if limitStr != "" {
+		limitTemp, err := strconv.Atoi(limitStr)
+		if err == nil && limitTemp > 0 && limitTemp > limit {
+			limit = limitTemp
+		}
+	}
+
+	if pageStr != "" {
+		pageTemp, err := strconv.Atoi(pageStr)
+		if err == nil && pageTemp > 0 && pageTemp > page {
+			page = pageTemp
+		}
+	}
+
+	userID := c.GetString("userID")
+
+	total, err := dbHelper.FetchTotalTodoCount(userID)
+
 	if err != nil {
-		c.JSON(401, gin.H{"error": "invalid session"})
+		utils.RespondError(c, 500, err, "couldn't fetch total count")
+		return
+	}
+	offset := (page - 1) * limit
+	totalPages := (total + limit - 1) / limit
+
+	todos, err := dbHelper.FetchTodos(userID, search, date, status, limit, page, offset)
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, err, "failed to fetch todos")
 		return
 	}
 
-	todos, err := dbHelper.GetTodos(userID, search, date, status)
-	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-
-	utils.RespondJSON(c, http.StatusOK, todos)
+	utils.RespondJSON(c, http.StatusOK, gin.H{
+		"allTodos":   todos,
+		"page":       page,
+		"limit":      limit,
+		"total":      total,
+		"totalPages": totalPages})
 }

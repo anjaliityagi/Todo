@@ -2,6 +2,7 @@ package server
 
 import (
 	"Todo-Server/handler"
+	"Todo-Server/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -22,15 +23,21 @@ func SetupRoutes() *Server {
 				"status": "Server is Running",
 			})
 		})
-
 		v1.POST("/register", handler.RegisterUser)
 		v1.POST("/login", handler.LoginUser)
-		v1.POST("/todos", handler.CreateTodo)
-		v1.PUT("/updatetodo/:todo-id", handler.UpdateTodo)
-		v1.DELETE("/deletetodo/:todo-id", handler.DeleteTodo)
-		v1.PUT("/logout", handler.Logout)
-		v1.GET("/todo/:todo-id", handler.FetchTodoById)
-		v1.GET("/todos", handler.GetAllTodos)
+
+		protected := v1.Group("/")
+
+		protected.Use(middleware.AuthMiddleware())
+		todoPath := protected.Group("/todo")
+
+		todoPath.POST("", handler.CreateTodo)
+		todoPath.PUT("/:todo-id", handler.UpdateTodoById)
+		todoPath.DELETE("/:todo-id", handler.DeleteTodo)
+		todoPath.GET("/:todo-id", handler.FetchTodoById)
+
+		protected.GET("/todos", handler.FetchAllTodos)
+		protected.PUT("/logout", handler.Logout)
 
 	}
 
