@@ -2,6 +2,7 @@ package handler
 
 import (
 	"Todo-Server/database/dbHelper"
+	"Todo-Server/utils"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ func FetchAllUsers(c *gin.Context) {
 
 	users, err := dbHelper.FetchAllUsers(limit, offset)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "failed to fetch users"})
+		utils.RespondError(c, 500, err, "failed to fetch users")
 		return
 	}
 
@@ -33,7 +34,7 @@ func FetchAllUsers(c *gin.Context) {
 	})
 }
 
-func GetAllTodos(c *gin.Context) {
+func FetchAllTodosForAllUsers(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "10")
 	offsetStr := c.DefaultQuery("offset", "0")
 
@@ -46,7 +47,7 @@ func GetAllTodos(c *gin.Context) {
 		return
 	}
 
-	todos, err := dbHelper.FetchAllTodos(limit, offset)
+	todos, err := dbHelper.FetchAllTodosForAllUsers(limit, offset)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "failed to fetch todos"})
 		return
@@ -58,20 +59,31 @@ func GetAllTodos(c *gin.Context) {
 	})
 }
 
-func SuspendUser(c *gin.Context) {
-	userID := c.Param("id")
+func ToggleSuspendTx(c *gin.Context) {
+	userID := c.Param("user-id")
 	currentUserID := c.GetString("userID")
+	suspendStr := c.Query("isSuspend")
+	if suspendStr == "" {
+		c.JSON(400, gin.H{"error": "Empty suspend"})
+		return
+	}
+	suspend, err := strconv.ParseBool(suspendStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid boolean value"})
+		return
+	}
+	//suspend := c.Query("suspend")
 
 	if userID == currentUserID {
-		c.JSON(400, gin.H{"error": "cannot suspend yourself"})
+		c.JSON(400, gin.H{"error": "cannot suspend/unsuspend yourself"})
 		return
 	}
 
-	err := dbHelper.SuspendUser(userID)
+	err = dbHelper.SuspendUserTx(userID, suspend)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "failed to suspend user"})
+		utils.RespondError(c, 500, err, "failed to suspend user")
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "user suspended successfully"})
+	c.JSON(200, gin.H{"message": "user suspended/unsuspended"})
 }

@@ -11,7 +11,7 @@ type Error struct {
 	MessageToUser string `json:"messageToUser"`
 }
 
-func RespondJSON(c *gin.Context, statusCode int, body interface{}) {
+func RespondJSON(c *gin.Context, statusCode int, body any) {
 	c.JSON(statusCode, body)
 }
 

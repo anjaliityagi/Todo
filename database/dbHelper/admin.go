@@ -50,7 +50,7 @@ func FetchUsersCount() (int, error) {
 	return count, nil
 }
 
-func FetchAllTodos(limit, offset int) ([]models.Todo, error) {
+func FetchAllTodosForAllUsers(limit, offset int) ([]models.Todo, error) {
 	var todos []models.Todo
 
 	SQL := `SELECT id, user_id, name , is_completed, created_at
@@ -82,13 +82,44 @@ func FetchTodosCount() (int, error) {
 	return count, nil
 }
 
-func SuspendUser(userID string) error {
-	SQL := `UPDATE users
-	        SET suspended_at = NOW()
-	        WHERE id = $1 AND archived_at IS NULL`
+func SuspendUserTx(userID string, suspend bool) error {
+	tx, err := database.Todo.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+	if suspend {
+		SQL := `UPDATE users
+		SET suspended_at = NOW()
+		WHERE id = $1 AND archived_at IS NULL`
 
-	_, err := database.Todo.Exec(SQL, userID)
-	return err
+		_, err = tx.Exec(SQL, userID)
+		if err != nil {
+			return err
+		}
+
+		SQL1 := `
+		UPDATE user_session
+		SET archived_at = NOW()
+		WHERE user_id = $1 AND archived_at IS NULL
+	`
+		_, err = tx.Exec(SQL1, userID)
+		if err != nil {
+			return err
+		}
+	} else {
+		SQL := `UPDATE users SET suspended_at= NULL WHERE id=$1 AND archived_at IS NULL AND suspended_at IS NOT NULL`
+
+		_, err = tx.Exec(SQL, userID)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return tx.Commit()
 }
 
 func IsUserSuspended(userID string) (bool, error) {

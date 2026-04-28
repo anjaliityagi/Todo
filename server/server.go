@@ -44,9 +44,9 @@ func SetupRoutes() *Server {
 		adminRoutes.Use(middleware.RequireRole("admin"))
 
 		adminRoutes.GET("/users", handler.FetchAllUsers)
-		adminRoutes.GET("/todos", handler.GetAllTodos)
-		adminRoutes.PUT("/users/:user-id/suspend", handler.SuspendUser)
-		
+		adminRoutes.GET("/todos", handler.FetchAllTodosForAllUsers)
+		adminRoutes.PUT("/users/:user-id/toggleSuspend", handler.ToggleSuspendTx)
+
 		auth.PUT("/logout", handler.Logout)
 	}
 

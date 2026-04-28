@@ -116,7 +116,7 @@ where id = $1
 func UpdateTodoByID(id, userID string, updateTodo models.UpdateTodo) error {
 
 	SQL := "UPDATE todos SET "
-	args := []interface{}{}
+	args := []any{}
 
 	if updateTodo.Name != nil {
 		args = append(args, *updateTodo.Name)

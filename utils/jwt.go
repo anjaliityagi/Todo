@@ -16,7 +16,7 @@ func GenerateJWT(userID string, Role string, sessionID string) (string, error) {
 		Role:      Role,
 		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "todo-app",
 		},
@@ -28,7 +28,7 @@ func GenerateJWT(userID string, Role string, sessionID string) (string, error) {
 }
 
 func VerifyJWT(tokenString string) (*models.Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &models.Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &models.Claims{}, func(token *jwt.Token) (any, error) {
 
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, jwt.ErrSignatureInvalid
