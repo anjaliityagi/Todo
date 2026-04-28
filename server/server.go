@@ -18,27 +18,36 @@ func SetupRoutes() *Server {
 
 	v1 := router.Group("/v1")
 	{
+
 		v1.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"status": "Server is Running",
 			})
 		})
+
 		v1.POST("/register", handler.RegisterUser)
 		v1.POST("/login", handler.LoginUser)
 
-		protected := v1.Group("/")
+		auth := v1.Group("/")
+		auth.Use(middleware.AuthMiddleware())
 
-		protected.Use(middleware.AuthMiddleware())
-		todoPath := protected.Group("/todo")
+		userRoutes := auth.Group("/")
+		userRoutes.Use(middleware.RequireRole("user", "admin"))
 
-		todoPath.POST("", handler.CreateTodo)
-		todoPath.PUT("/:todo-id", handler.UpdateTodoById)
-		todoPath.DELETE("/:todo-id", handler.DeleteTodo)
-		todoPath.GET("/:todo-id", handler.FetchTodoById)
+		userRoutes.POST("/todo", handler.CreateTodo)
+		userRoutes.PUT("/updatetodo/:todo-id", handler.UpdateTodoById)
+		userRoutes.DELETE("/deletetodo/:todo-id", handler.DeleteTodo)
+		userRoutes.GET("/todo/:todo-id", handler.FetchTodoById)
+		userRoutes.GET("/todos", handler.FetchAllTodos)
 
-		protected.GET("/todos", handler.FetchAllTodos)
-		protected.PUT("/logout", handler.Logout)
+		adminRoutes := auth.Group("/admin")
+		adminRoutes.Use(middleware.RequireRole("admin"))
 
+		adminRoutes.GET("/users", handler.FetchAllUsers)
+		adminRoutes.GET("/todos", handler.GetAllTodos)
+		adminRoutes.PUT("/users/:user-id/suspend", handler.SuspendUser)
+		
+		auth.PUT("/logout", handler.Logout)
 	}
 
 	return &Server{

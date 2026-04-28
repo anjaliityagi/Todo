@@ -26,7 +26,7 @@ func CreateTodo(c *gin.Context) {
 		return
 	}
 
-	err := dbHelper.CreateTodo(
+	todoId, err := dbHelper.CreateTodo(
 		userID,
 		todoRequest.Name,
 		todoRequest.Description,
@@ -38,7 +38,7 @@ func CreateTodo(c *gin.Context) {
 	}
 
 	utils.RespondJSON(c, http.StatusCreated, gin.H{
-
+		"TodoID":  todoId,
 		"message": "todo created successfully",
 	})
 }
@@ -88,7 +88,7 @@ func LoginUser(c *gin.Context) {
 
 	userDetail, err := dbHelper.GetUserByEmail(req.Email)
 	if err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, err, "invalid credentials")
+		utils.RespondError(c, http.StatusUnauthorized, err, "invalid credentials")
 		return
 	}
 
@@ -104,8 +104,18 @@ func LoginUser(c *gin.Context) {
 		return
 	}
 
-	utils.RespondJSON(c, http.StatusOK, gin.H{
-		"token": sessionID,
+	//utils.RespondJSON(c, http.StatusOK, gin.H{
+	//	"token": sessionID,
+	//})
+
+	token, err := utils.GenerateJWT(userDetail.ID, userDetail.Role, sessionID)
+	if err != nil {
+		utils.RespondError(c, 500, err, "could not generate token")
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"token": token,
 	})
 }
 
@@ -202,14 +212,14 @@ func FetchAllTodos(c *gin.Context) {
 
 	if limitStr != "" {
 		limitTemp, err := strconv.Atoi(limitStr)
-		if err == nil && limitTemp > 0 && limitTemp > limit {
+		if err == nil && limitTemp > 0 {
 			limit = limitTemp
 		}
 	}
 
 	if pageStr != "" {
 		pageTemp, err := strconv.Atoi(pageStr)
-		if err == nil && pageTemp > 0 && pageTemp > page {
+		if err == nil && pageTemp > 0 {
 			page = pageTemp
 		}
 	}

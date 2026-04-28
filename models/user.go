@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+)
 
 type CreateTodo struct {
 	Name        string    `json:"name" binding:"required,max=30"`
@@ -21,12 +25,13 @@ type LoginUser struct {
 type UserAuth struct {
 	ID       string `db:"id"`
 	Password string `db:"password"`
+	Role     string `db:"role"`
 }
 
 type UpdateTodo struct {
 	Name        *string    `json:"name" binding:"omitempty,max=30"`
 	Description *string    `json:"description" binding:"omitempty,max=200"`
-	Complete    *bool      `json:"complete" `
+	Complete    *bool      `json:"isCompleted" `
 	ExpiringAt  *time.Time `json:"expiringAt"`
 }
 
@@ -35,7 +40,18 @@ type Todo struct {
 	UserID      string    `db:"user_id" json:"userId"`
 	Name        string    `db:"name" json:"name"`
 	Description string    `db:"description" json:"description"`
-	Complete    bool      `db:"complete" json:"complete"`
+	IsCompleted bool      `db:"is_completed" json:"isCompleted"`
 	ExpiringAt  time.Time `db:"expiring_at" json:"expiringAt"`
 	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
+}
+
+type Claims struct {
+	UserID    string `json:"user_id"`
+	Role      string `json:"role"`
+	SessionID string `json:"session_id"`
+	jwt.RegisteredClaims
+}
+
+type User struct {
+	ID string `db:"id" json:"id"`
 }

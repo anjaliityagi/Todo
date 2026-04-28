@@ -6,8 +6,8 @@ import (
 )
 
 type Error struct {
-	StatusCode int `json:"statusCode"`
-	//Error         string `json:"error"`
+	StatusCode    int    `json:"statusCode"`
+	Error         string `json:"error"`
 	MessageToUser string `json:"messageToUser"`
 }
 
@@ -16,13 +16,14 @@ func RespondJSON(c *gin.Context, statusCode int, body interface{}) {
 }
 
 func RespondError(c *gin.Context, statusCode int, err error, messageToUser string) {
-	//var errString string
-	//if err != nil {
-	//	errString = err.Error()
-	//}
+	var errString string
+	if err != nil {
+		errString = err.Error()
+	}
 
 	c.JSON(statusCode, Error{
 		StatusCode:    statusCode,
+		Error:         errString,
 		MessageToUser: messageToUser,
 	})
 }

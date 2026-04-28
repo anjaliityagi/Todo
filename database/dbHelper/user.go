@@ -28,12 +28,18 @@ func CreateUser(name, email, password string) error {
 	return err
 }
 
-func CreateTodo(userID, name, description string, expiringAt time.Time) error {
+func CreateTodo(userID, name, description string, expiringAt time.Time) (string, error) {
+	var todoID string
 	SQL := `INSERT INTO todos (user_id,name,description,expiring_at)
-			VALUES ($1,$2,$3,$4)`
+			VALUES ($1,$2,$3,$4)
+			RETURNING id`
 
-	_, err := database.Todo.Exec(SQL, userID, name, description, expiringAt)
-	return err
+	err := database.Todo.Get(&todoID, SQL, userID, name, description, expiringAt)
+
+	if err != nil {
+		return "", err
+	}
+	return todoID, nil
 }
 
 func CreateUserSession(userID string) (string, error) {
@@ -48,9 +54,13 @@ func CreateUserSession(userID string) (string, error) {
 }
 
 func GetUserByEmail(email string) (*models.UserAuth, error) {
-	SQL := `SELECT id, password
-		FROM users
-		WHERE email = lower(trim($1)) AND archived_at IS NULL;`
+	SQL := `SELECT u.id, u.password, COALESCE(ur.role, 'user') AS role
+FROM users u
+LEFT JOIN user_roles ur 
+  ON u.id = ur.user_id AND ur.archived_at IS NULL
+WHERE u.email = lower(trim($1)) 
+  AND u.archived_at IS NULL
+  AND u.suspended_at IS NULL;`
 
 	var user models.UserAuth
 	err := database.Todo.Get(&user, SQL, email)
@@ -72,22 +82,22 @@ func DeleteSessionByToken(token string) error {
 	return nil
 }
 
-func GetUserIDBySession(token string) (string, error) {
-	SQL := `SELECT user_id
-FROM user_session
-WHERE id = $1
-and archived_at IS NULL `
-
-	var userId string
-
-	fmt.Println(userId)
-
-	err := database.Todo.Get(&userId, SQL, token)
-	if err != nil {
-		return "", err
-	}
-	return userId, nil
-}
+//func GetUserIDBySession(token string) (string, error) {
+//	SQL := `SELECT user_id
+//FROM user_session
+//WHERE id = $1
+//and archived_at IS NULL `
+//
+//	var userId string
+//
+//	fmt.Println(userId)
+//
+//	err := database.Todo.Get(&userId, SQL, token)
+//	if err != nil {
+//		return "", err
+//	}
+//	return userId, nil
+//}
 
 func DeleteTodo(id, userId string) error {
 	SQL := `UPDATE todos
@@ -123,7 +133,7 @@ func UpdateTodoByID(id, userID string, updateTodo models.UpdateTodo) error {
 	}
 	if updateTodo.Complete != nil {
 		args = append(args, *updateTodo.Complete)
-		SQL += fmt.Sprintf("complete = $%d, ", len(args))
+		SQL += fmt.Sprintf("is_completed = $%d, ", len(args))
 	}
 
 	if len(args) == 0 {
@@ -142,7 +152,7 @@ func UpdateTodoByID(id, userID string, updateTodo models.UpdateTodo) error {
 
 func FetchTodoById(todoId string, userId string) (models.Todo, error) {
 	var todo models.Todo
-	SQL := `SELECT id,user_id,name, description, complete, expiring_at, created_at
+	SQL := `SELECT id,user_id,name, description, is_completed, expiring_at, created_at
 FROM todos
 WHERE id = $1
   AND user_id = $2`
@@ -161,7 +171,7 @@ func FetchTodos(userID, search, date, status string, limit int, page int, offset
 	       user_id,
 	       name,
 	       description,
-	       complete,
+	       is_completed,
 	       expiring_at,
 	       created_at
 	FROM todos
@@ -169,9 +179,9 @@ func FetchTodos(userID, search, date, status string, limit int, page int, offset
 	  AND archived_at IS NULL
 	  AND (
 		$2 = '' 
-		OR ($2 = 'completed' AND complete = true)
-		OR ($2 = 'pending' AND complete = false AND expiring_at >= NOW())
-		OR ($2 = 'expired' AND complete = false AND expiring_at < NOW())
+		OR ($2 = 'completed' AND is_completed = true)
+		OR ($2 = 'pending' AND is_completed = false AND expiring_at >= NOW())
+		OR ($2 = 'expired' AND is_completed = false AND expiring_at < NOW())
 	  )
 	  AND (
 		$3 = '' OR expiring_at <= $3::TIMESTAMPTZ
@@ -200,4 +210,19 @@ func FetchTotalTodoCount(userId string) (int, error) {
 		return 0, err
 	}
 	return total, err
+}
+
+func IsSessionActive(sessionID string) (bool, error) {
+	SQL := `SELECT count(*) > 0
+	        FROM user_session
+	        WHERE id = $1
+	          AND archived_at IS NULL`
+
+	var exists bool
+	err := database.Todo.Get(&exists, SQL, sessionID)
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
 }
