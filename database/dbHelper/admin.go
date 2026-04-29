@@ -5,19 +5,19 @@ import (
 	"Todo-Server/models"
 )
 
-func GetUsersCount() (int, error) {
-	var count int
-	query := `SELECT COUNT(*)
-        FROM users
-        WHERE archived_at IS NULL;`
-
-	err := database.Todo.Get(&count, query)
-	if err != nil {
-		return 0, err
-	}
-
-	return count, nil
-}
+//func GetUsersCount() (int, error) {
+//	var count int
+//	query := `SELECT COUNT(*)
+//        FROM users
+//        WHERE archived_at IS NULL;`
+//
+//	err := database.Todo.Get(&count, query)
+//	if err != nil {
+//		return 0, err
+//	}
+//
+//	return count, nil
+//}
 
 func FetchAllUsers(limit, offset int) ([]models.User, error) {
 	var users []models.User

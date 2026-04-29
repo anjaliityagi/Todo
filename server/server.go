@@ -35,8 +35,8 @@ func SetupRoutes() *Server {
 		userRoutes.Use(middleware.RequireRole("user", "admin"))
 
 		userRoutes.POST("/todo", handler.CreateTodo)
-		userRoutes.PUT("/updatetodo/:todo-id", handler.UpdateTodoById)
-		userRoutes.DELETE("/deletetodo/:todo-id", handler.DeleteTodo)
+		userRoutes.PUT("/todo/:todo-id", handler.UpdateTodoById)
+		userRoutes.DELETE("/todo/:todo-id", handler.DeleteTodo)
 		userRoutes.GET("/todo/:todo-id", handler.FetchTodoById)
 		userRoutes.GET("/todos", handler.FetchAllTodos)
 
@@ -45,7 +45,7 @@ func SetupRoutes() *Server {
 
 		adminRoutes.GET("/users", handler.FetchAllUsers)
 		adminRoutes.GET("/todos", handler.FetchAllTodosForAllUsers)
-		adminRoutes.PUT("/users/:user-id/toggleSuspend", handler.ToggleSuspendTx)
+		adminRoutes.PUT("/users/:user-id/toggle-suspend", handler.ToggleSuspendTx)
 
 		auth.PUT("/logout", handler.Logout)
 	}
